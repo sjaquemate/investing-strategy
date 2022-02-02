@@ -7,8 +7,10 @@ import dash_bootstrap_components as dbc
 import plotly.express as px
 from dash.dependencies import Input, Output
 import numpy as np
+import flask
 
-app = dash.Dash(__name__)
+server = flask.Flask(__name__)
+app = dash.Dash(__name__, server=server)
 
 def generate_dropdown():
     return html.Div(className='div-for-dropdown',
