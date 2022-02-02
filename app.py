@@ -153,11 +153,5 @@ def update_timeseries(selected_dropdown_value):
 #     return fig
 
 
-
-def main():
-    app.layout = generate_app_layout()
-    app.run_server(debug=False)
-    # df = px.data.stocks()
-
-if __name__ ==  "__main__":
-    main()
+app.layout = generate_app_layout()
+app.run_server(debug=False)
