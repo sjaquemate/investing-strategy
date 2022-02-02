@@ -36,19 +36,19 @@ app.layout = html.Div(children=[
                          generate_dropdown(),
                      ]),
                      html.Div(className='eight columns div-for-charts bg-grey', children=[
-                         html.Div(className='twelve columns', style={'height': '50%'},
+                         html.Div(className='twelve columns', style={'height': '50%', 'border': '2px green solid'},
                                   children=[
                             # top
-                            dcc.Graph(id='timeseries', config={'displayModeBar': False}),
+                            dcc.Graph(id='timeseries', config={'displayModeBar': False}, style={'height': '100%'}),
                                   ]),
                          html.Div(children=[
                              # bottom left
                              html.Div(style={'border': '2px green solid'}, className='six columns', children=[
-                                dcc.Graph(id='something whole new', config={'displayModeBar': False})
+                                dcc.Graph(id='something whole new', config={'displayModeBar': False}, style={'height': '100%'})
                              ]),
                              # bottom right
                              html.Div( style={'border': '2px green solid'}, className='six columns', children=[]),
-                         ], className='row')
+                         ], className='row', style={'height': '50%', 'border': '2px green solid'})
 
                          # dcc.Graph(id='something else', config={'displayModeBar': False},
                              #           className='', style={'display': 'inline-block', 'border': '2px green solid', 'margin-top': 0,
