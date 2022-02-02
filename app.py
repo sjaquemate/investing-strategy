@@ -29,31 +29,34 @@ app.layout = html.Div(children=[
         html.Div(className='row',
                  children=[
                      html.Div(className='four columns div-user-controls', children=[
-                         # html.H2('Dash - STOCK PRICES'),
-                         # html.P('''Visualising time series with Plotly - Dash'''),
-                         # html.P('''Pick one or more stocks from the dropdown below.'''),
-                         # generate_dropdown(),
+                         # left
+                         html.H2('Dash - STOCK PRICES'),
+                         html.P('''Visualising time series with Plotly - Dash'''),
+                         html.P('''Pick one or more stocks from the dropdown below.'''),
+                         generate_dropdown(),
                      ]),
                      html.Div(className='eight columns div-for-charts bg-grey', children=[
-                         # dcc.Graph(id='timeseries', config={'displayModeBar': False},
-                         #           className='offset-by-one-column', style={'height': '50%'}),
-                         # html.H2('Dash - STOCK PRICES'),
                          html.Div(className='twelve columns', style={'height': '50%'},
-                                  children=[]),
+                                  children=[
+                            # top
+                            dcc.Graph(id='timeseries', config={'displayModeBar': False}),
+                                  ]),
                          html.Div(children=[
-                             html.Div(style={'width': '50%', 'height': '100%',
-                                             'background-color': 'white'}, children=[]),
-                             html.Div( style={'border': '2px green solid', 'width': '50%',
-                                              'height': '100px'}, children=[]),
+                             # bottom left
+                             html.Div(style={'border': '2px green solid'}, className='six columns', children=[
+                                dcc.Graph(id='something whole new', config={'displayModeBar': False})
+                             ]),
+                             # bottom right
+                             html.Div( style={'border': '2px green solid'}, className='six columns', children=[]),
+                         ], className='row')
 
-                             # dcc.Graph(id='something else', config={'displayModeBar': False},
+                         # dcc.Graph(id='something else', config={'displayModeBar': False},
                              #           className='', style={'display': 'inline-block', 'border': '2px green solid', 'margin-top': 0,
                              #         'width': '50%',
                              #                                'vertical-align': 'top'})]),
                              # dcc.Graph(id='something whole new', config={'displayModeBar': False},
                              #           className='', style={'width': '50%',
                              #                                'height': '70%'}),
-                        ], className='row')
                      ]),
         ])
     ])
