@@ -25,8 +25,7 @@ def generate_dropdown():
              ],
              style={'color': '#1E1E1E'})
 
-def generate_app_layout():
-    return html.Div(children=[
+app.layout = html.Div(children=[
         html.Div(className='row',
                  children=[
                      html.Div(className='four columns div-user-controls', children=[
@@ -155,7 +154,6 @@ def update_timeseries(selected_dropdown_value):
 
 
 def main():
-    app.layout = generate_app_layout()
     app.run_server(debug=False)
     # df = px.data.stocks()
 
