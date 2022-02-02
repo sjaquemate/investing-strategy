@@ -11,6 +11,7 @@ import flask
 
 # server = flask.Flask(__name__)
 app = dash.Dash(__name__) # , server=server)
+server = app.server
 
 def generate_dropdown():
     return html.Div(className='div-for-dropdown',
