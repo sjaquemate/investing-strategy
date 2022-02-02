@@ -9,8 +9,8 @@ from dash.dependencies import Input, Output
 import numpy as np
 import flask
 
-server = flask.Flask(__name__)
-app = dash.Dash(__name__, server=server)
+# server = flask.Flask(__name__)
+app = dash.Dash(__name__) # , server=server)
 
 def generate_dropdown():
     return html.Div(className='div-for-dropdown',
@@ -153,10 +153,10 @@ def update_timeseries(selected_dropdown_value):
 #     return fig
 
 
-
-app.layout = generate_app_layout()
-app.run_server(debug=False)
+def main():
+    app.layout = generate_app_layout()
+    app.run_server(debug=False)
     # df = px.data.stocks()
 
 if __name__ ==  "__main__":
-    pass
+    main()
