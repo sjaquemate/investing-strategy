@@ -7,48 +7,74 @@ import dash_bootstrap_components as dbc
 import plotly.express as px
 from dash.dependencies import Input, Output
 import numpy as np
-import flask
+from strategy import Investing
+from datetime import datetime
 
-# server = flask.Flask(__name__)
-app = dash.Dash(__name__) # , server=server)
+
+app = dash.Dash(__name__)
 server = app.server
+investing = Investing()
 
 def generate_dropdown():
     return html.Div(className='div-for-dropdown',
              children=[
                  dcc.Dropdown(id='stockselector',
-                              options={"hi": 'hi', "bye": 'bye'},
-                              multi=True,
-                              value='bye',
+                              options=[{'label': "Google", 'value': "GOOG"},
+                                       {'label': "Apple" , 'value': 'AAPL'},
+                              ],
+                              value='S&P500',
                               style={'backgroundColor': '#1E1E1E'},
                               className='stockselector')
+
              ],
              style={'color': '#1E1E1E'})
+
+def generate_rangeslider():
+    return dcc.RangeSlider(
+        id='period-range-slider',
+        min=1900,
+        max=2020,
+        step=1,
+        dots=False,
+        value=[2005, 2015],
+        pushable=5,
+        updatemode='mouseup',
+        tooltip={'placement': 'bottom', 'always_visible': True}
+    )
+
+strategy_options = {"dca": None, "vca": None, "lump": None}
+
+def generate_checklist():
+    return dcc.Checklist(
+
+        value=[None, None]
+    )
 
 app.layout = html.Div(children=[
         html.Div(className='row',
                  children=[
                      html.Div(className='four columns div-user-controls', children=[
                          # left
-                         html.H2('Dash - STOCK PRICES'),
-                         html.P('''Visualising time series with Plotly - Dash'''),
-                         html.P('''Pick one or more stocks from the dropdown below.'''),
+                         html.H2('Investing Strategy Dashboard'),
+                         html.P('Select your stock'),
                          generate_dropdown(),
+                         generate_rangeslider(),
+                         generate_checklist(),
                      ]),
                      html.Div(className='eight columns div-for-charts bg-grey', children=[
-                         html.Div(className='twelve columns', style={'height': '50%', 'border': '2px green solid'},
+                         html.Div(className='twelve columns', style={'height': '50%', 'border': '0px green solid'},
                                   children=[
                             # top
                             dcc.Graph(id='timeseries', config={'displayModeBar': False}, style={'height': '100%'}),
                                   ]),
                          html.Div(children=[
                              # bottom left
-                             html.Div(style={'border': '2px green solid'}, className='six columns', children=[
-                                dcc.Graph(id='something whole new', config={'displayModeBar': False}, style={'height': '100%'})
+                             html.Div(style={'border': '0px green solid'}, className='six columns', children=[
+                                dcc.Graph(id='distribution', config={'displayModeBar': False}, style={'height': '100%'})
                              ]),
                              # bottom right
-                             html.Div( style={'border': '2px green solid'}, className='six columns', children=[]),
-                         ], className='row', style={'height': '50%', 'border': '2px green solid'})
+                             html.Div( style={'border': '0px green solid'}, className='six columns', children=[]),
+                         ], className='row', style={'height': '50%', 'border': '0px green solid'})
 
                          # dcc.Graph(id='something else', config={'displayModeBar': False},
                              #           className='', style={'display': 'inline-block', 'border': '2px green solid', 'margin-top': 0,
@@ -61,41 +87,56 @@ app.layout = html.Div(children=[
         ])
     ])
 
-@app.callback(Output('timeseries', 'figure'),
-              [Input('stockselector', 'value')])
-def update_timeseries(selected_dropdown_value):
+
+@app.callback(
+    Output("dropdown", "options"),
+    Input("dropdown", "value"),
+)
+def update_strategy_options(value):
+    options = default_options
+    if len(value) >= 3:
+        options = [
+            {
+                "label": option["label"],
+                "value": option["value"],
+                "disabled": option["value"] not in value,
+            }
+            for option in options
+        ]
+    return options
+
+
+@app.callback([Output('timeseries', 'figure'),
+              Output('distribution', 'figure')],
+              [Input('stockselector', 'value'),
+               Input('period-range-slider', 'value')])
+def update_timeseries(selected_dropdown_value, period_values):
     ''' Draw traces of the feature 'value' based one the currently selected stocks '''
 
-    trace = []
+    investing.set_ticker(selected_dropdown_value)
+    investing.set_interval(datetime(1950, 1, 1), datetime(2010, 1, 1))
 
-    for stock in selected_dropdown_value:
-        trace.append(go.Scatter(x=np.arange(100),
-                                 y=np.random.random(100),
-                                 mode='lines',
-                                 opacity=0.7,
-                                 name=stock,
-                                 textposition='bottom center'))
-    # STEP 3
-    traces = [trace]
-    data = [val for sublist in traces for val in sublist]
-    # Define Figure
-    # STEP 4
-    figure = {'data': data,
+    timeseries = investing.get_timeseries()
+    x = timeseries.index
+    y = timeseries.values
+    line_timeseries = go.Scatter(x=x, y=y, mode='lines')
+
+    fig_timeseries = {'data': [line_timeseries],
               'layout': go.Layout(
-                  colorway=["#5E0DAC", '#FF4F00', '#375CB1', '#FF7400', '#FFF400', '#FF0056'],
+                  colorway=["red"],
                   template='plotly_dark',
                   paper_bgcolor='rgba(0, 0, 0, 0)',
                   plot_bgcolor='rgba(0, 0, 0, 0)',
-                  margin={'b': 15},
+                  #margin={'b': 15},
                   hovermode='x',
-                  autosize=True,
-                  title={'text': 'Stock Prices', 'font': {'color': 'white'}, 'x': 0.5},
-                  xaxis={'range': [0, 100]},
-              ),
+                  # title={'text': 'Stock Prices', 'font': {'color': 'white'}, 'x': 0.5},
+                  # sxaxis={'range': [0, 100]},
+              )}
 
-              }
 
-    return figure
+
+
+    return fig_timeseries, fig_timeseries
 
 # app.layout = html.Div([
 #     html.H1(id='H1', children='Styling using html components', style={'textAlign': 'center', \

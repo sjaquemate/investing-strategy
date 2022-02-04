@@ -1,5 +1,8 @@
+setuptools
 pandas
+pandas-datareader
 numpy
+yfinance
 plotly
 dash
 gunicorn
