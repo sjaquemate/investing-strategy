@@ -3,7 +3,6 @@ from typing import Optional
 import pandas as pd
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
-import yfinance as yf
 import numpy as np
 from dataclasses import dataclass
 import yahoo_fin.stock_info as si
