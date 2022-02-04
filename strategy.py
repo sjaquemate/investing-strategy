@@ -6,12 +6,11 @@ from dateutil.relativedelta import relativedelta
 import numpy as np
 from dataclasses import dataclass
 import yahoo_fin.stock_info as si
+import plotly.express as px
 
 
 # def get_historic_price(ticker, period='1000y'):
 #     return yf.Ticker(ticker).history(period=period)#['Open']
-#
-#
 
 
 def select_periodic_data(data, interval, period):
@@ -26,7 +25,7 @@ def select_periodic_data(data, interval, period):
 
 
 def get_monthly_price(ticker):  # todo get earlier prices
-    return si.get_data(ticker, start_date=datetime(1900, 1, 1),
+     return si.get_data(ticker, start_date=datetime(1900, 1, 1),
                        interval="1mo")['open'][:-1]  # monthly price without the last date
 
 
@@ -61,7 +60,7 @@ class Stock:
         return cls(ticker, monthly_price)
 
 
-def calculate_strategy_distribution(data, interval, strategy_fn,
+def calculate_strategy_gains(data, interval, strategy_fn,
                            buy_period, strategy_duration):
     subintervals = split_into_subintervals(interval, strategy_duration)
     gains = []
@@ -74,7 +73,6 @@ def calculate_strategy_distribution(data, interval, strategy_fn,
     yearly = gains ** (1 / strategy_duration.years)
 
     return gains
-
 
 def lump_sum_gain(data):
     return data[-1] / data[0]
@@ -90,8 +88,8 @@ class Investing:
         self.stock: Optional[Stock] = None
         self.interval = None
 
-    def set_interval(self, begin, end):
-        self.interval = Interval(begin, end)
+    def set_interval_years(self, begin, end):
+        self.interval = Interval(datetime(begin, 1, 1), datetime(end, 1, 1))
 
     def set_ticker(self, ticker):
         if self.stock is not None and ticker == self.stock.ticker:
@@ -103,18 +101,22 @@ class Investing:
         return self.stock.monthly_price
 
     def calculate_distribution(self, strategy_fn):
-        return calculate_strategy_distribution(self.stock.monthly_price, self.interval, strategy_fn,
+        gains = calculate_strategy_gains(self.stock.monthly_price, self.interval, strategy_fn,
                                                buy_period=relativedelta(months=1),
-                                               strategy_duration=relativedelta(years=1))
+                                               strategy_duration=relativedelta(years=5))
 
+        return gains
 
 def main():
     investing = Investing()
     investing.set_ticker('GE')
-    investing.set_interval(datetime(1950, 1, 1), datetime(2010, 1, 1))
+    investing.set_interval(datetime(1990, 1, 1), datetime(2020, 1, 1))
 
-    print(investing.get_timeseries())
-    print(investing.calculate_distribution(lump_sum_gain))
+    gains = investing.calculate_distribution(dca_gain)
+    print(gains.head(2))
+    fig = px.histogram(gains, x="gain")
+    fig.update_layout(bargap=0.2)
+    fig.show()
 
 if __name__ == "__main__":
     main()

@@ -9,7 +9,7 @@ from dash.dependencies import Input, Output
 import numpy as np
 from strategy import Investing
 from datetime import datetime
-
+from strategy import dca_gain
 
 app = dash.Dash(__name__)
 server = app.server
@@ -19,10 +19,9 @@ def generate_dropdown():
     return html.Div(className='div-for-dropdown',
              children=[
                  dcc.Dropdown(id='stockselector',
-                              options=[{'label': "Google", 'value': "GOOG"},
-                                       {'label': "Apple" , 'value': 'AAPL'},
-                              ],
-                              value='S&P500',
+                              options={"Google": 'AAPL',
+                                       "Apple": 'GOOG'},
+                              value='AAPL',
                               style={'backgroundColor': '#1E1E1E'},
                               className='stockselector')
 
@@ -33,10 +32,10 @@ def generate_rangeslider():
     return dcc.RangeSlider(
         id='period-range-slider',
         min=1900,
-        max=2020,
+        max=2022,
         step=1,
         dots=False,
-        value=[2005, 2015],
+        value=[1990, 2022],
         pushable=5,
         updatemode='mouseup',
         tooltip={'placement': 'bottom', 'always_visible': True}
@@ -53,7 +52,7 @@ def generate_checklist():
 app.layout = html.Div(children=[
         html.Div(className='row',
                  children=[
-                     html.Div(className='four columns div-user-controls', children=[
+                     html.Div(className='three columns div-user-controls', children=[
                          # left
                          html.H2('Investing Strategy Dashboard'),
                          html.P('Select your stock'),
@@ -61,19 +60,26 @@ app.layout = html.Div(children=[
                          generate_rangeslider(),
                          generate_checklist(),
                      ]),
-                     html.Div(className='eight columns div-for-charts bg-grey', children=[
-                         html.Div(className='twelve columns', style={'height': '50%', 'border': '0px green solid'},
+                     html.Div(className='nine columns div-for-charts bg-grey', children=[
+                         html.Div(className='twelve columns', style={'height': '40%', 'border': '0px green solid'},
                                   children=[
                             # top
                             dcc.Graph(id='timeseries', config={'displayModeBar': False}, style={'height': '100%'}),
                                   ]),
                          html.Div(children=[
                              # bottom left
-                             html.Div(style={'border': '0px green solid'}, className='six columns', children=[
+                             html.Div(style={'border': '0px green solid'}, className='four columns', children=[
                                 dcc.Graph(id='distribution', config={'displayModeBar': False}, style={'height': '100%'})
                              ]),
+                             # bottom middle
+                             html.Div( style={'border': '0px green solid'}, className='four columns', children=[
+                                dcc.Graph(id='distribution2', config={'displayModeBar': False}, style={'height': '100%'})
+                             ]),
                              # bottom right
-                             html.Div( style={'border': '0px green solid'}, className='six columns', children=[]),
+                             html.Div( style={'border': '0px green solid'}, className='four columns', children=[
+                                dcc.Graph(id='procon', config={'displayModeBar': False}, style={'height': '100%'})
+                             ]),
+
                          ], className='row', style={'height': '50%', 'border': '0px green solid'})
 
                          # dcc.Graph(id='something else', config={'displayModeBar': False},
@@ -88,24 +94,6 @@ app.layout = html.Div(children=[
     ])
 
 
-@app.callback(
-    Output("dropdown", "options"),
-    Input("dropdown", "value"),
-)
-def update_strategy_options(value):
-    options = default_options
-    if len(value) >= 3:
-        options = [
-            {
-                "label": option["label"],
-                "value": option["value"],
-                "disabled": option["value"] not in value,
-            }
-            for option in options
-        ]
-    return options
-
-
 @app.callback([Output('timeseries', 'figure'),
               Output('distribution', 'figure')],
               [Input('stockselector', 'value'),
@@ -114,15 +102,16 @@ def update_timeseries(selected_dropdown_value, period_values):
     ''' Draw traces of the feature 'value' based one the currently selected stocks '''
 
     investing.set_ticker(selected_dropdown_value)
-    investing.set_interval(datetime(1950, 1, 1), datetime(2010, 1, 1))
+    investing.set_interval_years(*period_values)
 
+    # timeseries
     timeseries = investing.get_timeseries()
     x = timeseries.index
     y = timeseries.values
     line_timeseries = go.Scatter(x=x, y=y, mode='lines')
 
     fig_timeseries = {'data': [line_timeseries],
-              'layout': go.Layout(
+                    'layout': go.Layout(
                   colorway=["red"],
                   template='plotly_dark',
                   paper_bgcolor='rgba(0, 0, 0, 0)',
@@ -133,10 +122,13 @@ def update_timeseries(selected_dropdown_value, period_values):
                   # sxaxis={'range': [0, 100]},
               )}
 
+    # distribution
+    distribution_1 = investing.calculate_distribution(dca_gain)
+    fig = px.histogram(data_frame=distribution_1, x="gain", nbins=30, histnorm='percent', labels={}, range_x=[0.5, 5])
+    fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
 
 
-
-    return fig_timeseries, fig_timeseries
+    return fig_timeseries, fig
 
 # app.layout = html.Div([
 #     html.H1(id='H1', children='Styling using html components', style={'textAlign': 'center', \
