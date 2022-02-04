@@ -2,7 +2,7 @@ setuptools
 pandas
 pandas-datareader
 numpy
-yfinance
+yahoo_fin
 plotly
 dash
 gunicorn
