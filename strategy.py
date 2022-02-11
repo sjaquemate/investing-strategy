@@ -71,8 +71,8 @@ def calculate_strategy_gains(data, interval, strategy_fn,
 
     gains = pd.DataFrame(gains, columns=['interval', 'gain']).set_index('interval')
     yearly = gains ** (1 / strategy_duration.years)
-
-    return gains
+    return yearly
+    # return gains
 
 def lump_sum_gain(data):
     return data[-1] / data[0]
@@ -90,6 +90,9 @@ class Investing:
 
     def set_interval_years(self, begin, end):
         self.interval = Interval(datetime(begin, 1, 1), datetime(end, 1, 1))
+
+    def get_interval_dates(self) -> (datetime, datetime):
+        return self.interval.begin, self.interval.end
 
     def set_ticker(self, ticker):
         if self.stock is not None and ticker == self.stock.ticker:
