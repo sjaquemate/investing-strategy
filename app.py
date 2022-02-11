@@ -9,6 +9,7 @@ from dash.dependencies import Input, Output
 import strategy
 
 app = dash.Dash(external_stylesheets=[dbc.themes.SIMPLEX])
+server = app.server
 
 range_slider = dbc.Col(
     [
@@ -19,7 +20,7 @@ range_slider = dbc.Col(
                         step=1, dots=False,
                         pushable=5, updatemode='mouseup',
                         tooltip={'placement': 'top', 'always_visible': True}
-        ),
+                        ),
     ]
 )
 
@@ -34,23 +35,23 @@ strategy_options = {'Lump sum': strategy.lump_sum_gain,
 
 strategy_items = dbc.Row(
     [
-    dbc.Col([
-        dbc.Label("Strategy 1"),
-        dbc.RadioItems(
-            options=[{'label': k, 'value': k} for k in strategy_options],
-            value='Lump sum',
-            id="strategy-input-1",
-        )
-    ]),
-    dbc.Col([
-        dbc.Label("Strategy 2"),
-        dbc.RadioItems(
-            options=[{'label': k, 'value': k} for k in strategy_options],
-            value='DCA',
-            id="strategy-input-2",
-        )
-    ])
-]
+        dbc.Col([
+            dbc.Label("Strategy 1"),
+            dbc.RadioItems(
+                options=[{'label': k, 'value': k} for k in strategy_options],
+                value='Lump sum',
+                id="strategy-input-1",
+            )
+        ]),
+        dbc.Col([
+            dbc.Label("Strategy 2"),
+            dbc.RadioItems(
+                options=[{'label': k, 'value': k} for k in strategy_options],
+                value='DCA',
+                id="strategy-input-2",
+            )
+        ])
+    ]
 )
 
 period = html.Div([
@@ -70,7 +71,6 @@ title = dbc.Row(html.H1("Title"), style={'text-align': "center"})
 
 option_view = dbc.Form([title, ticker_view, range_slider, strategy_items, period])
 
-
 figures_view = html.Div([
     dbc.Row(html.H1("Figures"), style={'text-align': "center"}),
     dcc.Graph(id='timeseries', style={'aspect-ratio': '4/1'}),
@@ -84,7 +84,6 @@ figures_view = html.Div([
         ], width=6)
     ])
 ])
-
 
 grid = dbc.Row([
     dbc.Col(
@@ -115,12 +114,11 @@ def update_graphs(ticker_text, year_interval, strategy_input_1, strategy_input_2
     start_year, end_year = year_interval
     investing.set_interval_years(start_year, end_year)
 
-
     fig_layout_kwargs = {'margin': dict(l=0, r=0, t=0, b=0),
                          'plot_bgcolor': 'rgb(0, 0, 0, 0)',
                          'paper_bgcolor': 'rgb(0, 0, 0, 0)',
                          'showlegend': False,
-                         #'hovermode': 'x',
+                         # 'hovermode': 'x',
                          }
 
     # timeseries
@@ -152,7 +150,7 @@ def update_graphs(ticker_text, year_interval, strategy_input_1, strategy_input_2
     range_x = (min_x, max_x)
 
     fig_distribution_1 = px.histogram(data_frame=distribution_1, x="gain", nbins=30,
-                                        histnorm='percent', range_x=range_x)
+                                      histnorm='percent', range_x=range_x)
     fig_distribution_2 = px.histogram(data_frame=distribution_2, x="gain", nbins=30,
                                       histnorm='percent', range_x=range_x)
 
@@ -189,6 +187,7 @@ def update_graphs(ticker_text, year_interval, strategy_input_1, strategy_input_2
 
 
 app.layout = dbc.Container(grid, fluid=True)
+
 
 def main():
     app.run_server()  # (debug=True, threaded=True)
