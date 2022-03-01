@@ -39,7 +39,7 @@ def split_into_subintervals(interval: Interval, duration: relativedelta,
                            increment=relativedelta(months=1)):
     subintervals = []
     subinterval = Interval(interval.begin, interval.begin + duration)
-    while subinterval.end < interval.end:
+    while subinterval.end <= interval.end:
         subintervals.append(subinterval)
         subinterval = Interval(subinterval.begin + increment,
                                subinterval.end + increment)
@@ -61,18 +61,18 @@ class Stock:
 
 
 def calculate_strategy_gains(data, interval, strategy_fn,
-                           buy_period, strategy_duration):
-    subintervals = split_into_subintervals(interval, strategy_duration)
+                             buy_period, investing_duration):
+    subintervals = split_into_subintervals(interval, investing_duration)
     gains = []
     for subinterval in subintervals:
         prices = select_periodic_data(data, subinterval, buy_period)
         gain = strategy_fn(prices)
-        gains.append(((subinterval.begin, subinterval.end), gain))
+        gains.append( ((subinterval.begin, subinterval.end), gain) )
 
-    gains = pd.DataFrame(gains, columns=['interval', 'gain']).set_index('interval')
-    yearly = gains ** (1 / strategy_duration.years)
-    return yearly
-    # return gains
+    df_gains = pd.DataFrame(gains, columns=['interval', 'gains_total']).set_index('interval')
+    df_gains['gains_yearly'] = df_gains['gains_total'] ** (1 / investing_duration.years)
+    return df_gains
+
 
 def lump_sum_gain(data):
     return data[-1] / data[0]
@@ -103,17 +103,16 @@ class Investing:
     def get_timeseries(self) -> pd.Series:
         return self.stock.monthly_price
 
-    def calculate_distribution(self, strategy_fn):
-        gains = calculate_strategy_gains(self.stock.monthly_price, self.interval, strategy_fn,
-                                               buy_period=relativedelta(months=1),
-                                               strategy_duration=relativedelta(years=5))
+    def calculate_distribution(self, strategy_fn, investing_duration_years):
+        return calculate_strategy_gains(self.stock.monthly_price, self.interval, strategy_fn,
+                                        buy_period=relativedelta(months=1),
+                                        investing_duration=relativedelta(years=investing_duration_years))
 
-        return gains
 
 def main():
     investing = Investing()
     investing.set_ticker('GE')
-    investing.set_interval(datetime(1990, 1, 1), datetime(2020, 1, 1))
+    investing.set_interval_years(1990, 2020)
 
     gains = investing.calculate_distribution(dca_gain)
     print(gains.head(2))
