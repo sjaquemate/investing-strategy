@@ -7,17 +7,9 @@ import plotly.express as px
 import plotly.graph_objects as go
 from dash.dependencies import Input, Output
 import strategy
-import pandas as pd
-from flask_caching import Cache
-
 
 app = dash.Dash(external_stylesheets=[dbc.themes.LUX])
 server = app.server
-cache = Cache(app.server, config={
-    'CACHE_TYPE': 'filesystem',
-    'CACHE_DIR': 'cache-directory'
-})
-TIMEOUT = 60
 
 range_slider = dbc.Col(
     [
@@ -151,7 +143,7 @@ def add_px(fig: go.Figure, px_object):
                Input('radioitems-input-3', 'value'),
                Input('radioitems-input-4', 'value'),
                Input('distribution-scatter', 'hoverData')])
-@cache.memoize(timeout=TIMEOUT)
+
 def update_graphs(ticker_text, year_interval, strategy_input_1, strategy_input_2,
                   investing_duration_years, gains_period,
                   scatter_hoverdata):
@@ -281,9 +273,10 @@ app.layout = dbc.Container(grid, fluid=True)
 
 
 def main():
-    app.run_server(
-        dev_tools_ui=True, debug=True,
-          dev_tools_hot_reload =True, threaded=True)
+    app.run_server()
+    # app.run_server(
+    #     dev_tools_ui=True, debug=True,
+    #       dev_tools_hot_reload =True, threaded=True)
 
 
 if __name__ == "__main__":
