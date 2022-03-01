@@ -9,3 +9,4 @@ gunicorn
 dash-html-components
 dash-core-components
 dash-bootstrap-components
+flask-caching
