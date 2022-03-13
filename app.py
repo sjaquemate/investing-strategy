@@ -7,6 +7,9 @@ import plotly.express as px
 import plotly.graph_objects as go
 from dash.dependencies import Input, Output
 import strategy
+from dash.exceptions import PreventUpdate
+import numpy as np
+import pandas as pd
 
 app = dash.Dash(external_stylesheets=[dbc.themes.LUX])
 server = app.server
@@ -37,7 +40,8 @@ ticker_view = html.Div([
 ])
 
 strategy_options = {'Lump sum': strategy.lump_sum_gain,
-                    'DCA': strategy.dca_gain}
+                    'DCA': strategy.dca_gain,
+                    'Equal stock': strategy.equal_stock_gain}
 
 strategy_items = dbc.Row(
     [
@@ -71,6 +75,7 @@ strategy_items = dbc.Row(
 )
 
 period = html.Div([
+    html.Img(src='info.png'),
     dbc.Label("Investing period"),
     dbc.RadioItems(
         options=[
@@ -104,17 +109,25 @@ option_view = dbc.Form([explanation_view, ticker_view, range_slider, strategy_it
 figures_view = html.Div([
     dbc.Row([
         dbc.Col([
-            dcc.Graph(id='timeseries', style={'aspect-ratio': '3/1'}),
-            html.Center([dcc.Graph(id="distribution-scatter",
-                      style={'width': '50%', 'aspect-ratio': '1/1'})]),
-            html.Center(dbc.Label("hover here", style={'text-align': 'center'}, html_for='distribution-scatter')),
-        ], width=6),
+            dcc.Loading(
+                children=dcc.Graph(id='timeseries', style={'aspect-ratio': '3/1'}),
+            ),
+            dcc.Loading(children=[
+                html.Center([dcc.Graph(id="distribution-scatter",
+                          style={'width': '50%', 'aspect-ratio': '1/1'})]),
+                html.Center(dbc.Label("hover here", style={'text-align': 'center'}, html_for='distribution-scatter')),
+            ])
+        ], width=5),
         dbc.Col([
-            html.Center(dbc.Label("Distribution of returns",  html_for='distribution-1')),
-            dcc.Graph(id="distribution-1", style={'aspect-ratio': '3/1'}),
-            html.Center(dbc.Label("sometext", style={'text-align': 'center'}, html_for='distribution-1')),
-            dcc.Graph(id="distribution-2", style={'aspect-ratio': '3/1'}),
-        ], width=6),
+            dcc.Loading(children=[
+                html.Center(dbc.Label("", id='distribution-1-label', html_for='distribution-1')),
+                dcc.Graph(id="distribution-1", style={'aspect-ratio': '3/1'}),
+            ]),
+            dcc.Loading(children=[
+                html.Center(dbc.Label("sometext", style={'text-align': 'center'}, html_for='distribution-1')),
+                dcc.Graph(id="distribution-2", style={'aspect-ratio': '3/1'}),
+            ])
+        ], width=5),
     ])
 ])
 
@@ -130,10 +143,9 @@ investing = strategy.Investing()
 def add_px(fig: go.Figure, px_object):
     fig.add_traces(list(px_object.select_traces()))
 
-# todo create timeseries overlay figure
-
 @app.callback([Output('timeseries', 'figure'),
                Output('distribution-1', 'figure'),
+               Output('distribution-1-label', 'children'),
                Output('distribution-2', 'figure'),
                Output('distribution-scatter', 'figure')],
               [Input('ticker-input', 'value'),
@@ -147,8 +159,14 @@ def add_px(fig: go.Figure, px_object):
 def update_graphs(ticker_text, year_interval, strategy_input_1, strategy_input_2,
                   investing_duration_years, gains_period,
                   scatter_hoverdata):
-    if False:
-        return dash.no_update
+
+    triggers = dash.callback_context.triggered
+    trigger_ids = [trigger['prop_id'].split('.')[0] for trigger in triggers]
+
+    if (len(trigger_ids) == 1) and (trigger_ids[0] == 'distribution-scatter'):
+        raise PreventUpdate
+
+
     ''' Draw traces of the feature 'value' based one the currently selected stocks '''
     investing.set_ticker(ticker_text)
     # todo if not valid set error message
@@ -196,8 +214,19 @@ def update_graphs(ticker_text, year_interval, strategy_input_1, strategy_input_2
     distribution_1 = investing.calculate_distribution(strategy_1, investing_duration_years)
     distribution_2 = investing.calculate_distribution(strategy_2, investing_duration_years)
 
-    distribution_1 = distribution_1[[gains_period]]
-    distribution_2 = distribution_2[[gains_period]]
+    def to_percentage(series: pd.Series):
+        return series*100 - 100
+
+    distribution_1 = to_percentage(distribution_1[gains_period])
+    distribution_2 = to_percentage(distribution_2[gains_period])
+
+    def get_mean_std_text(series: pd.Series):
+        mean = np.mean(series.values)
+        std = np.std(series.values)
+        return f'mean: {mean:.2f}% std: {std: .2f}%'
+
+    distribution_1_text = f'Distribution {gains_period} {get_mean_std_text(distribution_1)}'
+    # print(distribution_1_text)
 
     min_dis_1 = distribution_1.values.min()
     min_dis_2 = distribution_2.values.min()
@@ -207,9 +236,18 @@ def update_graphs(ticker_text, year_interval, strategy_input_1, strategy_input_2
     max_x = max(max_dis_1, max_dis_2)
     range_x = (min_x, max_x)
 
-    fig_distribution_1 = px.histogram(data_frame=distribution_1, x=gains_period, nbins=30,
+    # distribution_1 = distribution_1.to_frame()
+    def to_plot(series: pd.Series):
+        df = pd.DataFrame()
+        df['values'] = series
+        df['is_gain'] = df['values'] > 0
+        return df
+
+    df_plot = to_plot(distribution_1)
+    fig_distribution_1 = px.histogram(data_frame=df_plot, x='values', nbins=30,
+                                      color='is_gain',
                                       histnorm='percent', range_x=range_x,
-                                      color_discrete_sequence=['red'])
+                                      color_discrete_sequence=['pink', 'red'])
     fig_distribution_2 = px.histogram(data_frame=distribution_2, x=gains_period, nbins=30,
                                       histnorm='percent', range_x=range_x,
                                       color_discrete_sequence=['blue'])
@@ -220,9 +258,8 @@ def update_graphs(ticker_text, year_interval, strategy_input_1, strategy_input_2
 
     # distribution scatter
 
-    distribution_1.columns = ['one']
-    distribution_2.columns = ['two']
-    joined = distribution_1.join(distribution_2)
+    joined = distribution_1.to_frame().join(distribution_2, lsuffix='_1', rsuffix='_2')
+    joined.columns = ['one', 'two']
     joined['better'] = joined['one'] < joined['two']
 
     range = [min(min_dis_1, min_dis_2), max(max_dis_1, max_dis_2)]
@@ -236,47 +273,25 @@ def update_graphs(ticker_text, year_interval, strategy_input_1, strategy_input_2
                                                 color='better'))
 
     fig_distribution_scatter.add_trace(go.Scatter(x=[range[0], range[1]], y=[range[0], range[1]],
-                                                  mode='lines', line=dict(width=1)))
+                                                  mode='lines', line=dict(width=1)),)
 
-    # fig_distribution_scatter.add_trace(go.Scatter(x=[range[0], 1, 1], y=[range[0], 1, range[0]],
-    #                                               fill='toself', fillcolor='rgba(1, 255, 1, .1)',
-    #                                               mode='lines', line=dict(width=0)))
-    # fig_distribution_scatter.add_trace(go.Scatter(x=[1, range[1], range[1]], y=[1, range[1], 1],
-    #                                               fill='toself', fillcolor='rgba(1, 1, 255, .1)',
-    #                                               mode='lines', line=dict(width=0)))
-    # fig_distribution_scatter.add_trace(go.Scatter(x=[range[0], range[0], 1], y=[range[0], 1, 1],
-    #                                               fill='toself', fillcolor='rgba(255, 1, 0, .1)',
-    #                                               mode='lines', line=dict(width=0)))
-    # fig_distribution_scatter.add_trace(go.Scatter(x=[1, 1, range[1]], y=[1, range[1], range[1]],
-    #                                               fill='toself', fillcolor='rgba(209, 50, 255, .1)',
-    #                                               mode='lines', line=dict(width=0)))
-
-    # p = px.area(x=[0.9, 1], y=[0.9, 1])
-    # p.update_layout(**{'fill': 'tonexty'})
-    # add_px(fig_distribution_scatter, p)
-
-    # import pandas as pd
-    # fig_distribution_scatter.add_scatter(
-    #     go.Scatter(x=[min_dis_1, max_dis_1], y=[min_dis_2, max_dis_2])
-    # )
-    # print(min_dis_1, 1, min_dis_2, 1)
-    # fig_distribution_scatter.add_scatter(
-    #     go.Scatter(x=[min_dis_1, 1], y=[min_dis_2, 1])
-    # )
 
     fig_distribution_scatter.update_layout(**fig_layout_kwargs)
 
-    return [fig_timeseries, fig_distribution_1, fig_distribution_2, fig_distribution_scatter]
+    return [fig_timeseries,
+            fig_distribution_1, distribution_1_text,
+            fig_distribution_2,
+            fig_distribution_scatter]
 
 
 app.layout = dbc.Container(grid, fluid=True)
 
 
 def main():
-    app.run_server()
-    # app.run_server(
-    #     dev_tools_ui=True, debug=True,
-    #       dev_tools_hot_reload =True, threaded=True)
+    # app.run_server()
+    app.run_server(
+        dev_tools_ui=True, debug=True,
+          dev_tools_hot_reload =True, threaded=True)
 
 
 if __name__ == "__main__":

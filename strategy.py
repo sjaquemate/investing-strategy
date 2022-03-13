@@ -77,9 +77,35 @@ def calculate_strategy_gains(data, interval, strategy_fn,
 def lump_sum_gain(data):
     return data[-1] / data[0]
 
+def equal_stock_gain(data):
+    return len(data) * data[-1] / sum(data)
 
 def dca_gain(data):
-    return len(data) * data[-1] / sum(data)
+    return sum(1 / data) * data[-1] / len(data)
+
+def custom_vca(data: pd.Series, spread=2):
+
+    buffer = 3
+
+    last_value = None
+    values = []
+    buy_next = True
+
+    for index, value in data.iteritems():
+        if buy_next:  # buy 2 now
+            values.append(value)
+            values.append(value)
+            last_value = value
+            buy_next = False
+        else:
+            if value < last_value:
+                values.append(value)
+                last_value = value
+            else:
+                buy_next = True  # not buying now, buy next time
+
+    print(len(values) * data[-1] / sum(values), len(data) * data[-1] / sum(data))
+    return len(values) * data[-1] / sum(values)  # how much it is worth now vs what i spent
 
 
 class Investing:
@@ -110,15 +136,19 @@ class Investing:
 
 
 def main():
-    investing = Investing()
-    investing.set_ticker('GE')
-    investing.set_interval_years(1990, 2020)
+    # investing = Investing()
+    # investing.set_ticker('GE')
+    # investing.set_interval_years(2000, 2020)
+    # gains = investing.calculate_distribution(dca_gain, 20)
+    # print(gains.head(2))
+    # fig = px.histogram(gains, x="gains_total")
+    # fig.update_layout(bargap=0.2)
+    # fig.show()
 
-    gains = investing.calculate_distribution(dca_gain)
-    print(gains.head(2))
-    fig = px.histogram(gains, x="gain")
-    fig.update_layout(bargap=0.2)
-    fig.show()
+    fake_data = np.linspace(1, 2, 10000)
+    print('lump', lump_sum_gain(fake_data),
+          'equal_stock', equal_stock_gain(fake_data),
+          'dca', dca_gain(fake_data))
 
 if __name__ == "__main__":
     main()
