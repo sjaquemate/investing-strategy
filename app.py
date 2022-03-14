@@ -5,7 +5,7 @@ from dash import html
 from dash import dcc
 import plotly.express as px
 import plotly.graph_objects as go
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, State
 import strategy
 from dash.exceptions import PreventUpdate
 import numpy as np
@@ -30,65 +30,71 @@ range_slider = dbc.Col(
 explanation_view = html.Div([
     dcc.Markdown("There are multiple strategies to invest your money into the stockmarket, "
                  "each having its own trade-off between risk and rewards. This dashboard allows "
-                 "you to compare investing strategies by visualizing the returns from historic "
-                 "stock data"),
+                 "you to compare investing strategies by visualizing the returns from any historic "
+                 "stock data you are interested in.", style={'font-size': '12px'}),
 ])
 
-ticker_view = html.Div([
-    dbc.Input(type="text", id="ticker-input", value="^GSPC"),
-    dbc.FormText('E.g: "GOOG", "^gspc", "VUSA.AS"'),
-])
+@app.callback(
+    Output("offcanvas", "is_open"),
+    Input("open-offcanvas", "n_clicks"),
+    [State("offcanvas", "is_open")],
+)
+def toggle_offcanvas(n1, is_open):
+    if n1:
+        return not is_open
+    return is_open
+
+ticker_view = dbc.Row([
+    dbc.Col([
+        dbc.Input(type="text", id="ticker-input", value="^GSPC"),
+        ], width=6),
+    dbc.Col([
+        dbc.Label('', id='ticker-check-label')
+        ], width=6)
+    ], justify='center', align='center')
 
 strategy_options = {'Lump sum': strategy.lump_sum_gain,
                     'DCA': strategy.dca_gain,
                     'Equal stock': strategy.equal_stock_gain}
 
-strategy_items = dbc.Row(
-    [
-        dbc.Col([
-            dbc.Label("Strategy 1"),
-            dbc.RadioItems(
-                options=[{'label': k, 'value': k} for k in strategy_options],
-                value='Lump sum',
-                id="strategy-input-1",
-                label_checked_style={"color": "red"},
-                input_checked_style={
-                    "backgroundColor": "red",
-                    "borderColor": "red",
-                },
-            )
-        ]),
-        dbc.Col([
-            dbc.Label("Strategy 2"),
-            dbc.RadioItems(
-                options=[{'label': k, 'value': k} for k in strategy_options],
-                value='DCA',
-                id="strategy-input-2",
-                label_checked_style={"color": "blue"},
-                input_checked_style={
-                    "backgroundColor": "blue",
-                    "borderColor": "blue",
-                },
-            )
-        ])
-    ]
-)
+# style=dict(display='flex', justifyContent='end')
+# dbc.Col(html.Img(src='https://upload.wikimedia.org/wikipedia/commons/5/5a/Info_Simple_bw.svg',
+#                  style={'height': '10px', 'margin-right': '15px'}), width=3),
+strategy_items = dbc.Row([
+                dbc.Col(
+                dcc.Dropdown(
+                    options=[{'label': k, 'value': k} for k in strategy_options],
+                    value='Lump sum',
+                    clearable=False,
+                    id="strategy-input-1"), width=3),
+                ' vs ',
+                dbc.Col(
+                    dcc.Dropdown(
+                        options=[{'label': k, 'value': k} for k in strategy_options],
+                        value='DCA',
+                        clearable=False,
+                        id="strategy-input-2"), width=3),
 
-period = html.Div([
-    html.Img(src='info.png'),
+            # dbc.Label("Strategy 2", style={'width': '20%', 'align': 'center'}),
+            # html.Img(src='https://upload.wikimedia.org/wikipedia/commons/5/5a/Info_Simple_bw.svg',
+            #          style={'height': '10px', 'margin-left': '15px'}),
+        ], justify='center')
+
+period = dbc.Col([
     dbc.Label("Investing period"),
-    dbc.RadioItems(
+    dcc.Dropdown(
         options=[
             {"label": "1 year", "value": 1},
             {"label": "3 years", "value": 3},
             {"label": "5 years", "value": 5},
             {"label": "10 years", "value": 10},
         ],
-        value=1,
+        value=5,
         id="radioitems-input-3",
-        inline=True,
+        clearable=False,
     )
-])
+], width=6)
+
 gain = html.Div([
     dbc.RadioItems(
         options=[
@@ -104,19 +110,25 @@ gain = html.Div([
 title = dbc.Row(dcc.Markdown("### investing strategy dashboard"), style={'text-align': "center",
                                                                          'margin': 30})
 
-option_view = dbc.Form([explanation_view, ticker_view, range_slider, strategy_items, period, gain])
+option_view = dbc.Form([explanation_view, ticker_view, html.Br(), range_slider, period, html.Br(), gain])
 
-figures_view = html.Div([
-    dbc.Row([
-        dbc.Col([
+
+figures_view = dbc.Row([
+    title,
+    strategy_items,
+    html.Br(),
+    html.Br(),
+    html.Center(html.Hr(style={'width': '50%'})),
+    dbc.Col([
             dcc.Loading(
                 children=dcc.Graph(id='timeseries', style={'aspect-ratio': '3/1'}),
             ),
-            dcc.Loading(children=[
+dcc.Loading(children=[
                 html.Center([dcc.Graph(id="distribution-scatter",
-                          style={'width': '50%', 'aspect-ratio': '1/1'})]),
+                                       style={'width': '50%', 'aspect-ratio': '1/1'})]),
                 html.Center(dbc.Label("hover here", style={'text-align': 'center'}, html_for='distribution-scatter')),
-            ])
+            ]),
+
         ], width=5),
         dbc.Col([
             dcc.Loading(children=[
@@ -125,17 +137,28 @@ figures_view = html.Div([
             ]),
             dcc.Loading(children=[
                 html.Center(dbc.Label("sometext", style={'text-align': 'center'}, html_for='distribution-1')),
+                dbc.Button("Open Offcanvas", id="open-offcanvas", n_clicks=0),
+                dbc.Offcanvas(
+                    html.P(
+                        "This is the content of the Offcanvas. "
+                        "Close it by clicking on the close button, or "
+                        "the backdrop."
+                    ),
+                    id="offcanvas",
+                    placement='bottom',
+                    title="Title",
+                    is_open=False,
+                ),
                 dcc.Graph(id="distribution-2", style={'aspect-ratio': '3/1'}),
             ])
         ], width=5),
     ])
-])
 
 
-grid = dbc.Row([title,
-    dbc.Col([option_view], width=3),
-    dbc.Col([figures_view], width=9),
-])
+grid = dbc.Row([
+    dbc.Col([figures_view], width=7),
+    dbc.Col([option_view], width=4),
+], align='center', justify='center')
 
 investing = strategy.Investing()
 
@@ -143,7 +166,8 @@ investing = strategy.Investing()
 def add_px(fig: go.Figure, px_object):
     fig.add_traces(list(px_object.select_traces()))
 
-@app.callback([Output('timeseries', 'figure'),
+@app.callback([Output('ticker-check-label', 'children'),
+                Output('timeseries', 'figure'),
                Output('distribution-1', 'figure'),
                Output('distribution-1-label', 'children'),
                Output('distribution-2', 'figure'),
@@ -168,7 +192,10 @@ def update_graphs(ticker_text, year_interval, strategy_input_1, strategy_input_2
 
 
     ''' Draw traces of the feature 'value' based one the currently selected stocks '''
-    investing.set_ticker(ticker_text)
+    try:
+        investing.set_ticker(ticker_text)
+    except:
+        return '❌ not a valid ticker', dash.no_update, dash.no_update, ' ', dash.no_update, dash.no_update,
     # todo if not valid set error message
 
     start_year, end_year = year_interval
@@ -278,7 +305,7 @@ def update_graphs(ticker_text, year_interval, strategy_input_1, strategy_input_2
 
     fig_distribution_scatter.update_layout(**fig_layout_kwargs)
 
-    return [fig_timeseries,
+    return ['✔', fig_timeseries,
             fig_distribution_1, distribution_1_text,
             fig_distribution_2,
             fig_distribution_scatter]
