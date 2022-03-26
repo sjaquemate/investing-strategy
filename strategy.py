@@ -1,5 +1,3 @@
-from typing import Optional
-
 import pandas as pd
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
@@ -7,7 +5,7 @@ import numpy as np
 from dataclasses import dataclass
 import yahoo_fin.stock_info as si
 import plotly.express as px
-
+from functools import lru_cache
 
 # def get_historic_price(ticker, period='1000y'):
 #     return yf.Ticker(ticker).history(period=period)#['Open']
@@ -61,17 +59,18 @@ class Stock:
 
 
 def calculate_strategy_gains(data, interval, strategy_fn,
-                             buy_period, investing_duration):
+                               buy_period, investing_duration) -> pd.Series:
     subintervals = split_into_subintervals(interval, investing_duration)
+    
     gains = []
     for subinterval in subintervals:
         prices = select_periodic_data(data, subinterval, buy_period)
         gain = strategy_fn(prices)
-        gains.append( ((subinterval.begin, subinterval.end), gain) )
+        gains.append(gain)
 
-    df_gains = pd.DataFrame(gains, columns=['interval', 'gains_total']).set_index('interval')
-    df_gains['gains_yearly'] = df_gains['gains_total'] ** (1 / investing_duration.years)
-    return df_gains
+    gains_series = pd.Series(gains, 
+                             index=[(subinterval.begin, subinterval.end) for subinterval in subintervals])
+    return gains_series
 
 
 def lump_sum_gain(data):
@@ -111,13 +110,13 @@ def custom_vca(data: pd.Series, spread=2):
 class Investing:
 
     def __init__(self):
-        self.stock: Optional[Stock] = None
+        self.stock: Stock | None = None
         self.interval = None
 
     def set_interval_years(self, begin, end):
         self.interval = Interval(datetime(begin, 1, 1), datetime(end, 1, 1))
 
-    def get_interval_dates(self) -> (datetime, datetime):
+    def get_interval_dates(self) -> tuple[datetime, datetime]:
         return self.interval.begin, self.interval.end
 
     def set_ticker(self, ticker):
@@ -129,12 +128,20 @@ class Investing:
     def get_timeseries(self) -> pd.Series:
         return self.stock.monthly_price
 
-    def calculate_distribution(self, strategy_fn, investing_duration_years):
-        return calculate_strategy_gains(self.stock.monthly_price, self.interval, strategy_fn,
-                                        buy_period=relativedelta(months=1),
-                                        investing_duration=relativedelta(years=investing_duration_years))
+    def calculate_distribution(self, strategy_fn, investing_duration_years, 
+                               as_percentage=False, yearly=False):
+        gains = calculate_strategy_gains(self.stock.monthly_price, self.interval, strategy_fn,
+                                             buy_period=relativedelta(months=1),
+                                             investing_duration=relativedelta(years=investing_duration_years))
+        if yearly:
+            gains = gains ** (1 / investing_duration_years)
 
+        if as_percentage:
+            return (gains-1)*100
 
+        return gains 
+        
+        
 def main():
     # investing = Investing()
     # investing.set_ticker('GE')

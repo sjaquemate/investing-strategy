@@ -5,25 +5,46 @@ import dash
 import dash_bootstrap_components as dbc
 from dash import html
 from dash import dcc
-import plotly.express as px
 import plotly.graph_objects as go
 from dash.dependencies import Input, Output, State
-from components.rangeslider import range_slider
+from components.option_views import rangeslider, dropdown, badgebutton
 import strategy
 from dash.exceptions import PreventUpdate
 import numpy as np
 import pandas as pd
+import figures 
+from functools import partial
 
 Row = dbc.Row
 Col = dbc.Col
 Div = html.Div
 Markdown = dcc.Markdown
-Loading = dcc.Loading
+Loading = partial(dcc.Loading, type='dot')
+Graph = partial(dcc.Graph, config={'displayModeBar': False})
+
+label_ticker_id = 'label-ticker'
+fig_timeseries_id = 'fig-timeseries'
+fig_distribution_1_id = 'fig-distribution-1'
+label_distribution_1_id = 'label-distribution-1'
+fig_distribution_2_id = 'fig-distribution-2'
+label_distribution_2_id = 'label-distribution-2'
+fig_distribution_scatter_id = 'fig-distribution-scatter'
+badge_info_1_id = 'info-1'
+badge_info_2_id = 'info-2'
+
+offcanvas_id = 'offcanvas'
+offcanvas_text_id = 'offcanvas-text'
+input_ticker_id = 'input-ticker'
+rangeslider_period_id = 'rangeslider'
+input_strategy_1_id = 'input-strategy-1'
+input_strategy_2_id = 'input-strategy-2'
+input_investing_period_id = 'input-investing-period'
+radio_returns_period_id = 'radio-returns-period'
 
 app = dash.Dash(external_stylesheets=[dbc.themes.LUX])
 server = app.server
 
-range_slider_view = range_slider("period-range-slider", 1990, 2022, 10, 10)
+range_slider_view = rangeslider( rangeslider_period_id, 1990, 2022, 10, 10 )
 
 explanation_view = Markdown("There are multiple strategies to invest your money into the stockmarket, "
                  "each having its own trade-off between risk and rewards. This dashboard allows "
@@ -31,8 +52,8 @@ explanation_view = Markdown("There are multiple strategies to invest your money 
                  "stock data you are interested in.", style={'font-size': '12px'})
 
 ticker_view = Row([
-    Col(dbc.Input(type="text", id="ticker-input", value="^GSPC"), width=6),
-    Col(dbc.Label('', id='ticker-check-label'), width=6)
+    Col(dbc.Input(type="text", id=input_ticker_id, value="^GSPC"), width=6),
+    Col(dbc.Label('', id=label_ticker_id), width=6)
 ], justify='center', align='center')
 
 @dataclass
@@ -43,28 +64,19 @@ class Strategy:
     info: str = ''
     
 strategies = {
-    'Lump sum': Strategy('Lump sum', '#ffa600', strategy.lump_sum_gain, 'expl'),
+    'Lump sum': Strategy('Lump sum', '#003f5c', strategy.lump_sum_gain, 'expl'),
     'DCA': Strategy('Dollar cost averaging', '#ff6361', strategy.dca_gain, 'expl'),
-    'Equal stock': Strategy('Equal stock', '#003f5c', strategy.equal_stock_gain, 'expl')
+    'Equal stock': Strategy('Equal stock', '#ffa600', strategy.equal_stock_gain, 'expl')
 }
 
 options = [{'label': strategy, 'value': strategy} for strategy in strategies]
 
-def strategy_dropdown(id, options, default_value):
-    return dcc.Dropdown(id=id, options=options, value=default_value, clearable=False)
-  
-def badge_button(text, id):
-    return dbc.Badge(text, id=id, style={'cursor': 'pointer'})
-    
 strategy_items = dbc.Col([
     Row([
-        Col( strategy_dropdown("strategy-input-1", options, list(strategies)[0]), width=3 ),
-        Col( strategy_dropdown("strategy-input-2", options, list(strategies)[1]), width=3 )
-    ], justify='center'),
-    
-    Row([ 
-        Col(Loading(badge_button("info <", id='info-1')), width=2,  align='center'),
-        Col(Loading(badge_button("> info", id='info-2')), width=2,  align='center'),
+        Col( Row(badgebutton("info <", id='info-1'), justify='center'), width=2, align='center'),
+        Col( dropdown("input-strategy-1", options, list(strategies)[0]), width=3 ),
+        Col( dropdown("input-strategy-2", options, list(strategies)[1]), width=3 ),
+        Col( Row(badgebutton("> info", id='info-2'), justify='center'), width=2, align='center'),
     ], justify='center'),
 ])
 
@@ -78,7 +90,7 @@ investing_period_view = Col([
             {"label": "10 years", "value": 10},
         ],
         value=5,
-        id="radioitems-input-3",
+        id=input_investing_period_id,
         clearable=False,
     )
 ], width=6)
@@ -87,59 +99,51 @@ returns_period_view = Div([
     dbc.Label("Return period"),
     dbc.RadioItems(
         options=[
-            {"label": "yearly return", "value": 'gains_yearly'},
-            {"label": "total return", "value": 'gains_total'},
+            {"label": "yearly return", "value": 'yearly'},
+            {"label": "total return", "value": 'total'},
         ],
-        value='gains_yearly',
-        id="radioitems-input-4",
+        value='yearly',
+        id=radio_returns_period_id,
         inline=True,
     )
 ])
 
+options_view = dbc.Form([explanation_view, ticker_view, html.Br(), 
+                         range_slider_view, investing_period_view, html.Br(), 
+                         returns_period_view])
 
 
 title = Row(Col(Markdown("### investing strategy dashboard"), 
-            style={'text-align': "center", 'margin': 30}, width=10), 
+                style={'text-align': "center", 'margin': 30}, 
+            width=10), 
         justify='center')
 
-options_view = dbc.Form([explanation_view, ticker_view, html.Br(), 
-                        range_slider_view, investing_period_view, html.Br(), 
-                        returns_period_view])
-
 figures_view = Row([
+    
     dbc.Offcanvas(
-        Markdown("", id='offcanvas-text'),
-        id="offcanvas", placement='bottom', title="", is_open=False,
+        Markdown("", id=offcanvas_text_id),
+        id=offcanvas_id, placement='bottom', title="", is_open=False,
     ),
     title,
     strategy_items,
     Row(Col(html.Hr(), width=6), justify='center'),
     
     Col([
-        Loading(dcc.Graph(id='timeseries', style={'aspect-ratio': '3/1'})),
+        Graph(id=fig_timeseries_id, style={'aspect-ratio': '3/1'}),
         html.Br(),
-        Loading([
-            dcc.Graph(id="distribution-scatter",
-                      style={'width': '50%', 'aspect-ratio': '1/1'}),
-            dbc.Label("hover here", html_for='distribution-scatter'),
-        ]),
+        Graph(id=fig_distribution_scatter_id,
+                    style={'width': '50%', 'aspect-ratio': '1/1'}),
+        dbc.Label("hover here", html_for=fig_distribution_scatter_id),
     ], width=6),
     
     Col([
-        Loading([
-            dbc.Label("text", id='distribution-1-label', html_for='distribution-1'),
-            dcc.Graph(id="distribution-1", style={'aspect-ratio': '3/1'}),
-            dbc.Label("return (%)", html_for='distribution-1')
-        ]),
+        html.Center(dbc.Label("text", id=label_distribution_1_id, html_for=fig_distribution_1_id)),
+        Graph(id=fig_distribution_1_id, style={'aspect-ratio': '3/1'}),
         html.Br(),
-        dcc.Loading([
-            dbc.Label("", id='distribution-2-label', html_for='distribution-1'),
-            dcc.Graph(id="distribution-2", style={'aspect-ratio': '3/1'}),
-            dbc.Label("return (%)", html_for='distribution-2'),
-        ])
+        html.Center(dbc.Label("", id=label_distribution_2_id, html_for=fig_distribution_2_id)),
+        Graph(id=fig_distribution_2_id, style={'aspect-ratio': '3/1'}),
     ], width=6),
 ])
-
 
 grid = Row([
     Col(figures_view, width=8),
@@ -148,19 +152,20 @@ grid = Row([
 
 investing = strategy.Investing()
 
-
-def add_px(fig: go.Figure, px_object):
-    fig.add_traces(list(px_object.select_traces()))
-
+def calc_mean_std(series: pd.Series):
+    mean = np.mean(series.values)
+    std = np.std(series.values)
+    return mean, std
+    
 @app.callback(
-    [Output("offcanvas", "is_open"), 
-     Output("offcanvas", "title"),
-     Output("offcanvas-text", 'children')],
-    [Input("info-1", "n_clicks"),
-     Input("info-2", "n_clicks")],
-    [State("offcanvas", "is_open"),
-     State('strategy-input-1', 'value'),
-     State('strategy-input-2', 'value')],
+    [Output(offcanvas_id, "is_open"), 
+     Output(offcanvas_id, "title"),
+     Output(offcanvas_text_id, 'children')],
+    [Input(badge_info_1_id, "n_clicks"),
+     Input(badge_info_2_id, "n_clicks")],
+    [State(offcanvas_id, "is_open"),
+     State(input_strategy_1_id, 'value'),
+     State(input_strategy_2_id, 'value')],
 )
 def toggle_offcanvas(n_clicks_1, n_clicks_2, is_open_prev, strategy_input_1, strategy_input_2):
     
@@ -175,28 +180,27 @@ def toggle_offcanvas(n_clicks_1, n_clicks_2, is_open_prev, strategy_input_1, str
     else:    
         raise PreventUpdate
         
-    return [is_open, strategy.name, strategy.info] 
+    return [is_open, strategy.name, strategy.info]  
 
-
-@app.callback([Output('ticker-check-label', 'children'),
-               Output('timeseries', 'figure'),
-               Output('distribution-1', 'figure'),
-               Output('distribution-1-label', 'children'),
-               Output('distribution-2', 'figure'),
-               Output('distribution-2-label', 'children'),
-               Output('distribution-scatter', 'figure'),
-               Output("info-1", 'color'),
-               Output("info-2", 'color'),
-               ],
-              [Input('ticker-input', 'value'),
-               Input('period-range-slider', 'value'),
-               Input('strategy-input-1', 'value'),
-               Input('strategy-input-2', 'value'),
-               Input('radioitems-input-3', 'value'),
-               Input('radioitems-input-4', 'value'),
-               Input('distribution-scatter', 'hoverData')])
-def update_graphs(ticker_text, year_interval, strategy_input_1, strategy_input_2,
-                  investing_duration_years, gains_period,
+@app.callback([Output(label_ticker_id, 'children'),
+               Output(fig_timeseries_id, 'figure'),
+               Output(fig_distribution_1_id, 'figure'),
+               Output(label_distribution_1_id, 'children'),
+               Output(fig_distribution_2_id, 'figure'),
+               Output(label_distribution_2_id, 'children'),
+               Output(fig_distribution_scatter_id, 'figure'),
+               Output(badge_info_1_id, 'color'),
+               Output(badge_info_2_id, 'color')],
+              [Input(input_ticker_id, 'value'),
+               Input(rangeslider_period_id, 'value'),
+               Input(input_strategy_1_id, 'value'),
+               Input(input_strategy_2_id, 'value'),
+               Input(input_investing_period_id, 'value'),
+               Input(radio_returns_period_id, 'value'),
+               Input(fig_distribution_scatter_id, 'hoverData')])
+def update_graphs(ticker_text, year_interval, 
+                  strategy_input_1, strategy_input_2,
+                  investing_period, returns_period,
                   scatter_hoverdata):
 
     triggers = dash.callback_context.triggered
@@ -205,138 +209,57 @@ def update_graphs(ticker_text, year_interval, strategy_input_1, strategy_input_2
     if (len(trigger_ids) == 1) and (trigger_ids[0] == 'distribution-scatter'):
         raise PreventUpdate
 
-
-    ''' Draw traces of the feature 'value' based one the currently selected stocks '''
     try:
         investing.set_ticker(ticker_text)
     except:
         return ['❌ not a valid ticker'] + [dash.no_update]*8
-    # todo if not valid set error message
 
     start_year, end_year = year_interval
     investing.set_interval_years(start_year, end_year)
 
-    fig_layout_kwargs = {'margin': dict(l=0, r=0, t=0, b=0),
-                         'plot_bgcolor': 'rgb(0, 0, 0, 0)',
-                         'paper_bgcolor': 'rgb(0, 0, 0, 0)',
-                         'showlegend': False,
-                         # 'hovermode': 'x',
-                         }
-
-    # timeseries
-    fig_timeseries = go.Figure()
-
-    timeseries = investing.get_timeseries().to_frame()
+    ### timeseries ###
+    timeseries = investing.get_timeseries()
     start_date, end_date = investing.get_interval_dates()
-    is_selected = (start_date <= timeseries.index) & (timeseries.index <= end_date)
-    timeseries_selected = timeseries[is_selected]
-
-
-    add_px(fig_timeseries, px.area(timeseries_selected, color_discrete_sequence=['yellow']))
-
-    if scatter_hoverdata is not None:
-
-        start_date, end_date = scatter_hoverdata['points'][0]['customdata'][0]
-        # start_date, end_date = investing.get_interval_dates()
-        is_selected = (start_date <= timeseries.index) & (timeseries.index <= end_date)
-        timeseries_selected = timeseries[is_selected]
-
-        add_px(fig_timeseries, px.area(timeseries_selected,
-                                       color_discrete_sequence=['purple']))
-
-    add_px(fig_timeseries, px.line(timeseries, color_discrete_sequence=['red']))
-
-    fig_timeseries.update_layout(**fig_layout_kwargs)
-
-    # distribution
-    print(strategy_input_1)
+    fig_timeseries = figures.make_timeseries_figure(timeseries, start_date, end_date,
+                                                    linecolor='black', highlightcolor='black')
     
+    ### distribution histograms ###
     strategy_1 = strategies[strategy_input_1]
     strategy_2 = strategies[strategy_input_2]
 
-    distribution_1 = investing.calculate_distribution(strategy_1.function, investing_duration_years)
-    distribution_2 = investing.calculate_distribution(strategy_2.function, investing_duration_years)
-
-    def to_percentage(series: pd.Series):
-        return series*100 - 100
-
-    distribution_1 = to_percentage(distribution_1[gains_period])
-    distribution_2 = to_percentage(distribution_2[gains_period])
-
-    def get_mean_std_text(series: pd.Series):
-        mean = np.mean(series.values)
-        std = np.std(series.values)
-        return f'mean: {mean:.1f}% std: {std:.1f}%'
-
-    distribution_1_text = f'{get_mean_std_text(distribution_1)}'
-    distribution_2_text = f'{get_mean_std_text(distribution_2)}'
-
-    # print(distribution_1_text)
-
-    min_dis_1 = distribution_1.values.min()
-    min_dis_2 = distribution_2.values.min()
-    max_dis_1 = distribution_1.values.max()
-    max_dis_2 = distribution_2.values.max()
-    min_x = min(min_dis_1, min_dis_2)
-    max_x = max(max_dis_1, max_dis_2)
-    lim_x = (min_x, max_x)
-    range_x = np.linspace(min_x, max_x, 5)
+    yearly = returns_period == 'yearly'
     
-    def to_plot(series: pd.Series):
-        df = pd.DataFrame()
-        df['values'] = series
-        df['is_gain'] = df['values'] > 0
-        return df
+    distribution_1 = investing.calculate_distribution(strategy_1.function, investing_period, 
+                                                      as_percentage=True, yearly=yearly)
 
-    df_plot = to_plot(distribution_1)
-    fig_distribution_1 = px.histogram(data_frame=df_plot, x='values', nbins=30,
-                                      color='is_gain',
-                                      histnorm='percent', range_x=lim_x,
-                                      color_discrete_sequence=[strategy_1.color, 'black'])
-    fig_distribution_2 = px.histogram(data_frame=distribution_2, x=gains_period, nbins=30,
-                                      histnorm='percent', range_x=lim_x,
-                                      color_discrete_sequence=[strategy_2.color])
+    distribution_2 = investing.calculate_distribution(strategy_2.function, investing_period, 
+                                                      as_percentage=True, yearly=yearly)
 
-    fig_distribution_1.update_layout(
-        **fig_layout_kwargs,
-        xaxis_title="",
-        yaxis_title="",
-    )
-    fig_distribution_2.update_layout(
-        **fig_layout_kwargs,
-        xaxis_title="",
-        yaxis_title=""
-    )
+    generate_distribution_text = lambda mean, std: f'mean: {mean:.1f}% std: {std:.1f}%'
+    distribution_1_text = generate_distribution_text(*calc_mean_std(distribution_1))
+    distribution_2_text = generate_distribution_text(*calc_mean_std(distribution_2))
 
-    # distribution scatter
-    joined = distribution_1.to_frame().join(distribution_2, lsuffix='_1', rsuffix='_2')
-    joined.columns = ['one', 'two']
-    joined['better'] = joined['one'] < joined['two']
-
-    range = [min(min_dis_1, min_dis_2), max(max_dis_1, max_dis_2)]
-    fig_distribution_scatter = go.Figure(layout_xaxis_range=range,
-                                         layout_yaxis_range=range)
-
-    dates = [(start, end) for start, end in joined.index]
-
-    joined['dates'] = dates
-    add_px(fig_distribution_scatter, px.scatter(joined, x='one', y='two', custom_data=['dates'],
-                                                color='better', 
-                                                color_discrete_sequence=[strategy_1.color, strategy_2.color]))
-
-    fig_distribution_scatter.add_trace(go.Scatter(x=[range[0], range[1]], y=[range[0], range[1]],
-                                                  mode='lines', line=dict(width=1)))
-
-
-    fig_distribution_scatter.update_layout(**fig_layout_kwargs)
+    min_x = min(min(distribution_1), min(distribution_2))
+    max_x = max(max(distribution_1), max(distribution_2))
     
-    return ['✔', fig_timeseries,
-            fig_distribution_1, distribution_1_text,
-            fig_distribution_2, distribution_2_text,
-            fig_distribution_scatter,
-            strategy_1.color,
-            strategy_2.color,
-            ]
+    fig_distribution_1 = figures.make_distribution_histogram_figure(distribution_1, (min_x, max_x), strategy_1.color)
+    fig_distribution_2 = figures.make_distribution_histogram_figure(distribution_2, (min_x, max_x), strategy_2.color)
+    
+    ### distribution scatter ###
+    fig_distribution_scatter = figures.make_distribution_scatter_figure(distribution_1, distribution_2,
+                                                                        strategy_1.color, strategy_2.color)
+    
+    return [
+        '✔', 
+        fig_timeseries,
+        fig_distribution_1, 
+        distribution_1_text,
+        fig_distribution_2, 
+        distribution_2_text,
+        fig_distribution_scatter,
+        strategy_1.color,
+        strategy_2.color,
+    ]
 
 
 app.layout = dbc.Container(grid, fluid=True)
